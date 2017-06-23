@@ -4,9 +4,11 @@ import _ from 'lodash';
 import fs from 'fs';
 import pdf from 'html-pdf';
 import moment from 'moment';
+import request from 'request';
 
 const pages = nextRoutes();
 
+pages.add('login', '/login/:accessToken');
 pages.add('createEvent', '/:collectiveSlug/events/(new|create)');
 pages.add('event', '/:collectiveSlug/events/:eventSlug');
 pages.add('editEvent', '/:collectiveSlug/events/:eventSlug/edit');
@@ -16,6 +18,30 @@ pages.add('nametags', '/:collectiveSlug/events/:eventSlug/nametags');
 pages.add('button', '/:collectiveSlug/donate/button');
 
 module.exports = (server, app) => {
+
+  /**
+   * Pipe the requests before the middlewares, the piping will only work with raw
+   * data
+   * More infos: https://github.com/request/request/issues/1664#issuecomment-117721025
+   */
+  server.all('/api/*', (req, res) => {
+
+    const getApiUrl = url => {
+      const withoutParams = process.env.API_URL + (url.replace('/api/', '/'));
+      const hasParams = `${url}`.match(/\?/) 
+
+      return `${withoutParams}${hasParams ? '&' : '?'}api_key=${process.env.API_KEY}`;
+    };
+
+    req
+      .pipe(request(getApiUrl(req.url), { followRedirect: false }))
+      .on('error', (e) => {
+        console.error("error calling api", getApiUrl(req.url), e);
+        res.status(500).send(e);
+      })
+      .pipe(res);
+  });
+
 
   server.get('/:collectiveSlug/donate/button:size(|@2x).png', (req, res) => {
     const color = (req.query.color === 'blue') ? 'blue' : 'white';

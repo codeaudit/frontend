@@ -1,45 +1,38 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import TopBarProfileMenu from './TopBarProfileMenu';
+import { login } from '../lib/api';
 
 const logo = '/static/images/opencollective-icon.svg';
 
 class TopBar extends React.Component {
 
+  static propTypes = {
+    LoggedInUser: PropTypes.object
+  }
+
   constructor(props) {
     super(props);
+    this.login = this.login.bind(this);
+    this.showLoginForm = this.showLoginForm.bind(this);
+    this.api = { login };
     this.state = {
-      showProfileMenu: false
+      showLoginForm: false
     };
   }
 
-  componentDidMount() {
-    this.onClickOutsideRef = this.onClickOutside.bind(this);
-    document.addEventListener('click', this.onClickOutsideRef);
-  }
-
-  componentWillUnmount() {
-    document.removeEventListener('click', this.onClickOutsideRef);
-  }
-
-  onClickOutside() {
-    this.setState({showProfileMenu: false});
-  }
-
-  toggleProfileMenu(e) {
-    if (e.target.className.indexOf('LoginTopBarProfileButton') !== -1) {
-      this.setState({showProfileMenu: !this.state.showProfileMenu});
-      e.nativeEvent.stopImmediatePropagation();
+  login(e) {
+    e.preventDefault();
+    const email = this.refs.email.value;
+    if (!this.state.showLoginForm || this.state.success) {
+      return this.setState({showLoginForm: true, success: null, error: null});
     }
-  }
-
-  onClickLogout(e) {
-    this.props.logout();
-    this.toggleProfileMenu(e);
-  }
-
-  onClickSubscriptions(e) {
-    this.props.pushState(null, '/subscriptions')
-    this.toggleProfileMenu(e);
+    if (!email) {
+      this.setState({showLoginForm: false, success: null, error: null});
+    }
+    return this.api.login(email, window.location.href).then(() => {
+      this.setState({success: "email sent with magic link to login"});
+    });
   }
   
   renderProfileMenu() {
@@ -74,9 +67,13 @@ class TopBar extends React.Component {
     )
   }
 
+  showLoginForm() {
+    this.setState({showLoginForm: true, success: null, error: null});
+    this.refs.email.focus();
+  }
+
   render() {
     const { className, LoggedInUser } = this.props;
-    const { showProfileMenu } = this.state;
 
     return (
       <div className={`${className} TopBar`}>
@@ -97,6 +94,8 @@ class TopBar extends React.Component {
           100%  { transform: rotate(360deg); }
         }
         .nav {
+          display: flex;
+          align-items: center;
           box-sizing: border-box;
           position: absolute;
           top: 0px;
@@ -127,7 +126,7 @@ class TopBar extends React.Component {
         .nav a {
           box-sizing: border-box;
           display: inline-block;
-          font-size: 12px;
+          font-size: 1.2rem;
           letter-spacing: 1px;
           text-align: center;
           color: #b4bbbf;
@@ -138,6 +137,103 @@ class TopBar extends React.Component {
         .nav a:last-child {
           margin-right: 0;
           padding-right: 0;          
+        }
+
+        .loginForm {
+          display: inline-block;
+          position: relative;
+          margin-left: 1rem;
+          line-height: 3rem;
+        }
+
+        .loginForm a {
+          margin: 0px;
+          padding: 0px;
+        }
+
+        form {
+          display: flex;
+        }
+
+        .loginForm .inputWrapper {
+          display: inline-block;
+          overflow: hidden;
+          height: 3rem;
+          margin-right: 1rem;
+          width: 0px;
+          transition: 1s;
+          -webkit-perspective: 1000;
+          -moz-perspective: 1000;
+          -o-perspective: 1000;
+          perspective: 1000;
+        }
+
+        .loginForm .inputWrapper.show {
+          padding: 0 0.8rem;
+          width: 22rem;
+        }
+
+        .loginForm input {
+          width: 22rem;
+          letter-spacing: 0.5px;
+          font-size: 1.2rem;
+          margin-right: 1rem;
+        }
+
+        .loginForm .success {
+          display: inline-block;
+          font-size: 1.2rem;
+          letter-spacing: 1px;
+          color: #46B0ED;
+        }
+
+        .flipper {
+          width: 100%;
+          height: 100%;
+          -webkit-transition: 0.6s;
+          -webkit-transform-style: preserve-3d;
+
+          -moz-transition: 0.6s;
+          -moz-transform-style: preserve-3d;
+          
+          -o-transition: 0.6s;
+          -o-transform-style: preserve-3d;
+
+          transition: 0.6s;
+          transform-style: preserve-3d;
+
+          position: relative;
+        }
+
+        .front, .back {
+          -webkit-backface-visibility: hidden;
+          -moz-backface-visibility: hidden;
+          -o-backface-visibility: hidden;
+          backface-visibility: hidden;
+
+          width: 100%;
+          height: 100%;
+          position: absolute;
+          top: 0;
+          left: 0;
+        }
+
+        .success .flipper {
+          -webkit-transform: rotateY(180deg);
+          -moz-transform: rotateY(180deg);
+          -o-transform: rotateY(180deg);
+          transform: rotateY(180deg);
+        }
+
+        .front {
+          z-index: 2;
+        }
+
+        .back {
+          -webkit-transform: rotateY(180deg);
+          -moz-transform: rotateY(180deg);
+          -o-transform: rotateY(180deg);
+          transform: rotateY(180deg);
         }
 
         @media(max-width: 380px) {
@@ -154,9 +250,27 @@ class TopBar extends React.Component {
             <li><a href="https://medium.com/open-collective">Blog</a></li>
           </ul>
           <div className="separator"></div>
-          { !LoggedInUser && <a href="/login?next=/">Login</a> }
+          { !LoggedInUser && 
+          <div className="loginForm">
+            <form onSubmit={this.login}>
+              <div className={`inputWrapper ${this.state.success ? 'success' : ''} ${this.state.showLoginForm ? 'show' : ''}`}>
+                <div className="flipper">
+                  <div className="front">
+                    <input type="email" ref="email" placeholder="<Enter your email>" />
+                  </div>
+                  <div className="back">
+                    { this.state.error && <div className="error">{this.state.error}</div> }
+                    { this.state.success && <div className="success">{this.state.success}</div> }
+                  </div>
+                </div>
+              </div>
+              <a href="#" onClick={this.login}>Login</a> 
+            </form>
+          </div>
+          }
           { LoggedInUser && <TopBarProfileMenu LoggedInUser={LoggedInUser} /> }
         </div>
+
       </div>
     )
   }
